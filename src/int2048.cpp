@@ -233,122 +233,26 @@ void int2048::divmodAbs(const int2048 &a, const int2048 &b, int2048 &q, int2048 
     return;
   }
 
-  const long long B = BASE;
-  int n = static_cast<int>(a.d.size());
-  int m = static_cast<int>(b.d.size());
-
-  if (m == 1) {
-    q.d.assign(n, 0);
-    long long rem = 0;
-    long long div = b.d[0];
-    for (int i = n - 1; i >= 0; --i) {
-      long long cur = a.d[i] + rem * B;
-      q.d[i] = static_cast<int>(cur / div);
-      rem = cur % div;
-    }
-    q.neg = false;
-    q.trim();
-
-    r = int2048(0);
-    r.d[0] = static_cast<int>(rem);
-    r.neg = false;
-    r.trim();
-    return;
-  }
-
-  int norm = static_cast<int>(B / (b.d.back() + 1));
-  std::vector<long long> u(n + 1, 0), v(m, 0);
-
-  long long carry = 0;
-  for (int i = 0; i < n; ++i) {
-    long long cur = static_cast<long long>(a.d[i]) * norm + carry;
-    u[i] = cur % B;
-    carry = cur / B;
-  }
-  u[n] = carry;
-
-  carry = 0;
-  for (int i = 0; i < m; ++i) {
-    long long cur = static_cast<long long>(b.d[i]) * norm + carry;
-    v[i] = cur % B;
-    carry = cur / B;
-  }
-
-  q.d.assign(n - m + 1, 0);
+  q.d.assign(a.d.size(), 0);
   q.neg = false;
+  r = int2048(0);
 
-  for (int j = n - m; j >= 0; --j) {
-    long long u2 = u[j + m];
-    long long u1 = u[j + m - 1];
-    long long u0 = (m >= 2 ? u[j + m - 2] : 0);
+  for (int i = static_cast<int>(a.d.size()) - 1; i >= 0; --i) {
+    r.mulBaseAdd(a.d[i]);
 
-    long long v1 = v[m - 1];
-    long long v0 = (m >= 2 ? v[m - 2] : 0);
-
-    long long qhat = (u2 * B + u1) / v1;
-    long long rhat = (u2 * B + u1) % v1;
-
-    if (qhat >= B) {
-      qhat = B - 1;
-      rhat += v1;
-    }
-
-    while (m >= 2 && qhat * v0 > B * rhat + u0) {
-      --qhat;
-      rhat += v1;
-      if (rhat >= B)
-        break;
-    }
-
-    long long borrow = 0;
-    long long mulCarry = 0;
-    for (int i = 0; i < m; ++i) {
-      long long prod = qhat * v[i] + mulCarry;
-      mulCarry = prod / B;
-      prod %= B;
-
-      long long sub = u[j + i] - prod - borrow;
-      if (sub < 0) {
-        sub += B;
-        borrow = 1;
-      } else {
-        borrow = 0;
+    int qd = estimateQuotientDigit(r, b);
+    if (qd > 0) {
+      int2048 prod = b.mulInt(qd);
+      while (absCmp(prod, r) > 0) {
+        --qd;
+        prod = absSub(prod, b);
       }
-      u[j + i] = sub;
+      r = absSub(r, prod);
     }
-
-    long long subTop = u[j + m] - mulCarry - borrow;
-    if (subTop < 0) {
-      --qhat;
-      long long addCarry = 0;
-      for (int i = 0; i < m; ++i) {
-        long long sum = u[j + i] + v[i] + addCarry;
-        if (sum >= B) {
-          sum -= B;
-          addCarry = 1;
-        } else {
-          addCarry = 0;
-        }
-        u[j + i] = sum;
-      }
-      u[j + m] += addCarry;
-    } else {
-      u[j + m] = subTop;
-    }
-
-    q.d[j] = static_cast<int>(qhat);
+    q.d[i] = qd;
   }
 
   q.trim();
-
-  r.d.assign(m, 0);
-  long long rem = 0;
-  for (int i = m - 1; i >= 0; --i) {
-    long long cur = u[i] + rem * B;
-    r.d[i] = static_cast<int>(cur / norm);
-    rem = cur % norm;
-  }
-  r.neg = false;
   r.trim();
 }
 
